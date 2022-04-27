@@ -44,6 +44,18 @@ func startTailscale(ctx context.Context) error {
 	// When quick-deploying from the admin panel, the key value gets set automatically.
 	tsAuthKey := os.Getenv("TAILSCALE_AUTHKEY")
 
+	// We ask heroku to startup a "heroku-postgresql" add-on (see app.json).
+	// We open up the db here to help us manage our tailscale state file.
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		return fmt.Errorf("DATABASE_URL is not set")
+	}
+	db, err := sql.Open("postgres", databaseURL+"?sslmode=require")
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	defer db.Close()
+
 	// When the Heroku dyno restarts, all state/local storage gets wiped.
 	// To avoid creating new tailscale nodes on each restart (restarts happen fairly frequently on the Heroku free tier),
 	// we store the tailscale state file contents in our postgres db in a "tailscale_data" table.
@@ -104,6 +116,16 @@ func startTailscale(ctx context.Context) error {
 	return nil
 }
 
+func startWikiServer(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "node", "/wiki/server")
+	// Without specifying the port here, wiki.js will use the default random public port of the Heroku dyno.
+	// We force it to port 3000 so we can make it only accessible via tailscale.
+	cmd.Env = append(os.Environ(), "PORT=3000")
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start wiki server: %w", err)
+	}
+	return nil
+}
 
 // startPublicDummyServer starts a go webserver that displays a simple welcome prompt to viewers.
 // Heroku requires something to be running at it's public port, otherwise it shuts down the dyno.
