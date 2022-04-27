@@ -5,7 +5,7 @@ RUN go build -o app ./main.go
 
 FROM alpine:latest as tailscale
 WORKDIR /app
-ENV TSFILE=tailscale_1.14.0_amd64.tgz
+ENV TSFILE=tailscale_1.24.0_amd64.tgz
 RUN wget https://pkgs.tailscale.com/stable/${TSFILE} && \
   tar xzf ${TSFILE} --strip-components=1
 
